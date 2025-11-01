@@ -1,104 +1,157 @@
-import React, { useState, useEffect, useRef } from "react";
+// src/pages/Chat.jsx
+import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
-import { db, auth } from "../firebase";
 import {
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  onSnapshot,
+  serverTimestamp,
   doc,
   getDoc,
   setDoc,
-  onSnapshot,
-  updateDoc,
-  arrayUnion,
-  serverTimestamp,
 } from "firebase/firestore";
+import { db, auth } from "../firebase";
 
-const Chat = () => {
-  const { uid } = useParams(); // UID da pessoa com quem vamos falar
-  const currentUser = auth.currentUser;
+export default function Chat() {
+  const { uid } = useParams(); // UID do outro utilizador
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const chatRef = useRef(null);
+  const [receiver, setReceiver] = useState(null);
+  const messagesEndRef = useRef(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
-  // Gerar ID único (ordenado)
-  const chatId =
-    currentUser && uid
-      ? [currentUser.uid, uid].sort().join("_")
-      : null;
+  // 🔹 Garante que auth está carregado
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged((user) => {
+      setCurrentUser(user);
+    });
+    return () => unsub();
+  }, []);
 
-  // Ler mensagens em tempo real
+  const currentUID = currentUser?.uid;
+  const chatId = currentUID && uid ? [currentUID, uid].sort().join("_") : null;
+
+  // 🔹 Carrega dados do outro utilizador
+  useEffect(() => {
+    const fetchReceiver = async () => {
+      if (!uid) return;
+      const ref = doc(db, "users", uid);
+      const snap = await getDoc(ref);
+      if (snap.exists()) setReceiver(snap.data());
+    };
+    fetchReceiver();
+  }, [uid]);
+
+  // 🔹 Escuta mensagens em tempo real
   useEffect(() => {
     if (!chatId) return;
-    const chatDoc = doc(db, "chats", chatId);
 
-    const unsubscribe = onSnapshot(chatDoc, (snap) => {
-      if (snap.exists()) {
-        setMessages(snap.data().messages || []);
-      } else {
-        setMessages([]);
-      }
-    });
-
-    return unsubscribe;
-  }, [chatId]);
-
-  // Enviar mensagem
-  const sendMessage = async (e) => {
-    e.preventDefault();
-    if (!input.trim() || !currentUser || !uid) return;
-
-    const chatDoc = doc(db, "chats", chatId);
-    const message = {
-      sender: currentUser.uid,
-      text: input.trim(),
-      timestamp: serverTimestamp(),
-    };
-
-    // Cria o chat se não existir, senão atualiza
-    await setDoc(
-      chatDoc,
-      {
-        participants: [currentUser.uid, uid],
-        messages: arrayUnion(message),
-      },
-      { merge: true }
+    const q = query(
+      collection(db, "chats", chatId, "messages"),
+      orderBy("timestamp", "asc")
     );
 
-    setInput("");
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+      setMessages(list);
+    });
+
+    return () => unsubscribe();
+  }, [chatId]);
+
+  // 🔹 Envia mensagem
+  const sendMessage = async (e) => {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || !currentUID || !uid) return;
+
+    try {
+      // Adiciona mensagem ao Firestore
+      await addDoc(collection(db, "chats", chatId, "messages"), {
+        sender: currentUID,
+        text,
+        timestamp: serverTimestamp(),
+      });
+
+      // Atualiza subcoleção de conversas dos dois utilizadores
+      await setDoc(
+        doc(db, "users", currentUID, "conversations", uid),
+        {
+          with: uid,
+          lastMessage: text,
+          timestamp: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      await setDoc(
+        doc(db, "users", uid, "conversations", currentUID),
+        {
+          with: currentUID,
+          lastMessage: text,
+          timestamp: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      setInput("");
+    } catch (err) {
+      console.error("Erro ao enviar mensagem:", err);
+    }
   };
 
-  // Scroll automático para o fim
+  // 🔹 Scroll automático
   useEffect(() => {
-    if (chatRef.current) {
-      chatRef.current.scrollTop = chatRef.current.scrollHeight;
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  if (!currentUser) return <p>⚠️ Tens de iniciar sessão para usar o chat.</p>;
+  if (!receiver) return <p>A carregar conversa...</p>;
+
   return (
-    <div style={{ maxWidth: 600, margin: "auto", padding: "1rem" }}>
-      <h2>💬 Chat</h2>
+    <div
+      style={{
+        maxWidth: 600,
+        margin: "2rem auto",
+        border: "1px solid #ccc",
+        borderRadius: 8,
+        padding: 16,
+        display: "flex",
+        flexDirection: "column",
+        height: "80vh",
+      }}
+    >
+      <h3>💬 Conversa com {receiver.name}</h3>
+
+      {/* Mensagens */}
       <div
-        ref={chatRef}
         style={{
-          height: "400px",
+          flex: 1,
           overflowY: "auto",
-          border: "1px solid #ccc",
-          padding: "1rem",
-          marginBottom: "1rem",
+          marginTop: 10,
+          marginBottom: 10,
+          padding: "0 5px",
         }}
       >
-        {messages.length === 0 && <p>Nenhuma mensagem ainda.</p>}
-        {messages.map((msg, i) => (
+        {messages.map((msg) => (
           <div
-            key={i}
+            key={msg.id}
             style={{
-              textAlign: msg.sender === currentUser.uid ? "right" : "left",
-              marginBottom: "0.5rem",
+              textAlign: msg.sender === currentUID ? "right" : "left",
+              margin: "4px 0",
             }}
           >
             <span
               style={{
-                background: msg.sender === currentUser.uid ? "#dcf8c6" : "#f1f0f0",
-                padding: "8px 12px",
-                borderRadius: "12px",
+                backgroundColor:
+                  msg.sender === currentUID ? "#dcf8c6" : "#f1f0f0",
+                padding: "6px 10px",
+                borderRadius: 10,
                 display: "inline-block",
               }}
             >
@@ -106,21 +159,34 @@ const Chat = () => {
             </span>
           </div>
         ))}
+        <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={sendMessage} style={{ display: "flex", gap: "8px" }}>
+      {/* Campo de envio */}
+      <form
+        onSubmit={sendMessage}
+        style={{
+          display: "flex",
+          gap: "8px",
+          borderTop: "1px solid #ddd",
+          paddingTop: "8px",
+        }}
+      >
         <input
           type="text"
-          placeholder="Escreve uma mensagem..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          style={{ flex: 1 }}
+          placeholder="Escreve uma mensagem..."
+          style={{
+            flex: 1,
+            padding: "8px",
+            borderRadius: 6,
+            border: "1px solid #ccc",
+          }}
         />
         <button type="submit">Enviar</button>
       </form>
     </div>
   );
-};
-
-export default Chat;
+}
 

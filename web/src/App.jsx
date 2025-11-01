@@ -9,35 +9,68 @@ import ProfileForm from "./components/ProfileForm";
 import Home from "./pages/Home";
 import Chat from "./pages/Chat";
 import ProfilePublic from "./pages/ProfilePublic";
-
+import Conversations from "./pages/Conversations";
 
 import "./App.css";
 
 function App() {
-  const [user, setUser] = useState(undefined); // undefined = a verificar autenticação
+  const [user, setUser] = useState(undefined); // undefined = ainda a carregar
   const navigate = useNavigate();
 
-  // Verifica se o utilizador está autenticado
+  // 🔹 Monitora o estado da autenticação
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       console.log("Estado do utilizador:", u);
-      if (u) {
-        setUser(u);
-      } else {
-        setUser(null);
-      }
+      setUser(u || null);
     });
     return () => unsubscribe();
   }, []);
 
-  // Função de logout
+  // 🔹 Logout
   const handleLogout = async () => {
     await signOut(auth);
     setUser(null);
     navigate("/login");
   };
 
-  // Enquanto o estado está a carregar
+  // 🔹 Barra de navegação
+  const NavBar = () => (
+    <nav
+      style={{
+        padding: "10px",
+        borderBottom: "1px solid #ddd",
+        marginBottom: "20px",
+      }}
+    >
+      {user ? (
+        <>
+          <Link to="/">🏠 Home</Link> |{" "}
+          <Link to="/profile">👤 Perfil</Link> |{" "}
+          <Link to="/conversations">💬 Mensagens</Link> |{" "}
+          <button
+            onClick={handleLogout}
+            style={{
+              background: "none",
+              border: "none",
+              color: "blue",
+              cursor: "pointer",
+            }}
+          >
+            🚪 Sair
+          </button>
+          <span style={{ marginLeft: "10px", color: "#555" }}>
+            {user.email}
+          </span>
+        </>
+      ) : (
+        <>
+          <Link to="/">🏠 Home</Link> | <Link to="/login">Entrar</Link>
+        </>
+      )}
+    </nav>
+  );
+
+  // 🔹 Enquanto o auth ainda está a carregar
   if (user === undefined) {
     return (
       <div style={{ padding: "2rem", fontSize: "20px" }}>
@@ -46,25 +79,15 @@ function App() {
     );
   }
 
+  // 🔹 Estrutura principal
   return (
     <div className="App" style={{ padding: "2rem" }}>
       <h1>🎓 Study Match MVP</h1>
 
-      {/* Barra de navegação simples */}
-      <nav style={{ marginBottom: "20px" }}>
-        {user ? (
-          <>
-            <Link to="/">Home</Link> |{" "}
-            <Link to="/edit-profile">Editar Perfil</Link> |{" "}
-            <button onClick={handleLogout}>Sair</button>
-          </>
-        ) : (
-          <Link to="/login">Entrar</Link>
-        )}
-      </nav>
+      <NavBar />
 
-      {/* Rotas principais */}
       <Routes>
+        {/* Home */}
         <Route
           path="/"
           element={
@@ -73,14 +96,16 @@ function App() {
             ) : (
               <div>
                 <h2>Bem-vindo ao Study Match!</h2>
-                <p>Por favor, entra para ver os perfis.</p>
+                <p>Entra para encontrares explicadores ou alunos.</p>
+                <Link to="/login">Ir para Login</Link>
               </div>
             )
           }
         />
 
+        {/* Perfil (edição do utilizador logado) */}
         <Route
-          path="/edit-profile"
+          path="/profile"
           element={
             user ? (
               <ProfileForm />
@@ -93,21 +118,40 @@ function App() {
           }
         />
 
+        {/* Página pública de um perfil */}
+        <Route path="/profile/:uid" element={<ProfilePublic />} />
+
+        {/* Chat individual */}
+        <Route path="/chat/:uid" element={<Chat />} />
+
+        {/* Conversas recentes */}
+        <Route
+          path="/conversations"
+          element={
+            user ? (
+              <Conversations />
+            ) : (
+              <div>
+                <h2>Precisas de entrar para ver as tuas conversas.</h2>
+                <Link to="/login">Ir para login</Link>
+              </div>
+            )
+          }
+        />
+
+        {/* Login */}
         <Route path="/login" element={<AuthForm />} />
 
-        {/* Rota de fallback (caso URL errada) */}
+        {/* Página 404 */}
         <Route
           path="*"
           element={
             <div>
-              <h2>Página não encontrada</h2>
+              <h2>Página não encontrada 😕</h2>
               <Link to="/">Voltar à Home</Link>
             </div>
           }
         />
-        <Route path="/chat/:uid" element={<Chat />} />
-        <Route path="/profile/:uid" element={<ProfilePublic />} />
-
       </Routes>
     </div>
   );
