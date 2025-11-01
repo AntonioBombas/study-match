@@ -8,6 +8,7 @@ import AuthForm from "./components/AuthForm";
 import ProfileForm from "./components/ProfileForm";
 import Home from "./pages/Home";
 import Chat from "./pages/Chat";
+import ProfilePublic from "./pages/ProfilePublic";
 
 
 import "./App.css";
@@ -105,6 +106,7 @@ function App() {
           }
         />
         <Route path="/chat/:uid" element={<Chat />} />
+        <Route path="/profile/:uid" element={<ProfilePublic />} />
 
       </Routes>
     </div>
