@@ -1,8 +1,9 @@
 // src/App.jsx
 import React, { useState, useEffect } from "react";
-import { Routes, Route, useNavigate, Link } from "react-router-dom";
+import { Routes, Route, useNavigate, Link, useLocation } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from "./firebase";
+import { collection, onSnapshot } from "firebase/firestore";
+import { auth, db } from "./firebase";
 
 import AuthForm from "./components/AuthForm";
 import ProfileForm from "./components/ProfileForm";
@@ -15,7 +16,20 @@ import "./App.css";
 
 function App() {
   const [user, setUser] = useState(undefined); // undefined = ainda a carregar
+  const [unreadCount, setUnreadCount] = useState(0); // contador de mensagens novas
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // 🔹 Atualiza o título da aba conforme a rota
+  useEffect(() => {
+    const titles = {
+      "/": "Home | Study Match",
+      "/profile": "O teu perfil | Study Match",
+      "/login": "Entrar | Study Match",
+      "/conversations": "Mensagens | Study Match",
+    };
+    document.title = titles[location.pathname] || "Study Match";
+  }, [location]);
 
   // 🔹 Monitora o estado da autenticação
   useEffect(() => {
@@ -25,6 +39,24 @@ function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // 🔹 Escuta em tempo real o número de mensagens não lidas
+  useEffect(() => {
+    if (!user) return;
+
+    const q = collection(db, "users", user.uid, "conversations");
+    const unsub = onSnapshot(q, (snap) => {
+      let count = 0;
+      snap.forEach((doc) => {
+        const data = doc.data();
+        // Exemplo: cada conversa pode ter campo "unread" com número de mensagens por ler
+        if (data.unread && data.unread > 0) count += data.unread;
+      });
+      setUnreadCount(count);
+    });
+
+    return () => unsub();
+  }, [user]);
 
   // 🔹 Logout
   const handleLogout = async () => {
@@ -46,7 +78,10 @@ function App() {
         <>
           <Link to="/">🏠 Home</Link> |{" "}
           <Link to="/profile">👤 Perfil</Link> |{" "}
-          <Link to="/conversations">💬 Mensagens</Link> |{" "}
+          <Link to="/conversations">
+            💬 Mensagens {unreadCount > 0 && <strong>({unreadCount})</strong>}
+          </Link>{" "}
+          |{" "}
           <button
             onClick={handleLogout}
             style={{
@@ -73,8 +108,15 @@ function App() {
   // 🔹 Enquanto o auth ainda está a carregar
   if (user === undefined) {
     return (
-      <div style={{ padding: "2rem", fontSize: "20px" }}>
-        <h2>Carregando autenticação...</h2>
+      <div
+        style={{
+          textAlign: "center",
+          marginTop: "100px",
+          fontSize: "20px",
+        }}
+      >
+        <h2>🔄 A verificar sessão...</h2>
+        <p>Por favor, aguarda um momento.</p>
       </div>
     );
   }

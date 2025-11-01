@@ -11,6 +11,8 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
+  increment,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 
@@ -64,6 +66,22 @@ export default function Chat() {
     return () => unsubscribe();
   }, [chatId]);
 
+  // 🔹 Quando o utilizador abre a conversa, marca como lida (unread = 0)
+  useEffect(() => {
+    if (!currentUID || !uid) return;
+
+    const clearUnread = async () => {
+      try {
+        const ref = doc(db, "users", currentUID, "conversations", uid);
+        await updateDoc(ref, { unread: 0 });
+      } catch (err) {
+        console.log("Conversa ainda sem contador, a criar mais tarde.");
+      }
+    };
+
+    clearUnread();
+  }, [currentUID, uid]);
+
   // 🔹 Envia mensagem
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -78,23 +96,26 @@ export default function Chat() {
         timestamp: serverTimestamp(),
       });
 
-      // Atualiza subcoleção de conversas dos dois utilizadores
+      // 🔸 Atualiza resumo da conversa para quem envia
       await setDoc(
         doc(db, "users", currentUID, "conversations", uid),
         {
           with: uid,
           lastMessage: text,
           timestamp: serverTimestamp(),
+          unread: 0, // quem envia não tem mensagens por ler
         },
         { merge: true }
       );
 
+      // 🔸 Atualiza resumo da conversa para quem recebe
       await setDoc(
         doc(db, "users", uid, "conversations", currentUID),
         {
           with: currentUID,
           lastMessage: text,
           timestamp: serverTimestamp(),
+          unread: increment(1), // soma 1 mensagem não lida
         },
         { merge: true }
       );
@@ -105,7 +126,7 @@ export default function Chat() {
     }
   };
 
-  // 🔹 Scroll automático
+  // 🔹 Scroll automático para a última mensagem
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);

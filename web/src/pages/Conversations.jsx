@@ -1,106 +1,91 @@
 // src/pages/Conversations.jsx
 import React, { useEffect, useState } from "react";
-import {
-  collection,
-  query,
-  orderBy,
-  onSnapshot,
-  getDoc,
-  doc,
-} from "firebase/firestore";
-import { db, auth } from "../firebase";
+import { collection, onSnapshot, doc, getDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
+import { db, auth } from "../firebase";
 
 export default function Conversations() {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
 
-  // Garante que o auth está pronto
+  // 🔹 Escuta em tempo real as conversas do utilizador autenticado
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged((user) => {
-      if (user) {
-        setCurrentUser(user);
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const q = collection(db, "users", user.uid, "conversations");
+    const unsub = onSnapshot(q, async (snap) => {
+      const list = [];
+
+      for (const d of snap.docs) {
+        const data = d.data();
+        // busca o nome do outro utilizador
+        const otherRef = doc(db, "users", d.id);
+        const otherSnap = await getDoc(otherRef);
+        const otherUser = otherSnap.exists() ? otherSnap.data() : {};
+
+        list.push({
+          id: d.id,
+          ...data,
+          name: otherUser.name || "Utilizador desconhecido",
+        });
       }
-    });
-    return () => unsub();
-  }, []);
 
-  useEffect(() => {
-    if (!currentUser) return;
+      // Ordena por timestamp (mais recente primeiro)
+      list.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
-    const q = query(
-      collection(db, "users", currentUser.uid, "conversations"),
-      orderBy("timestamp", "desc")
-    );
-
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const convos = await Promise.all(
-        snapshot.docs.map(async (docSnap) => {
-          const data = docSnap.data();
-          const otherUID = data.with;
-
-          // Busca dados do outro utilizador
-          const userRef = doc(db, "users", otherUID);
-          const userSnap = await getDoc(userRef);
-
-          const userData = userSnap.exists()
-            ? userSnap.data()
-            : { name: "Utilizador desconhecido" };
-
-          return {
-            id: otherUID,
-            name: userData.name,
-            lastMessage: data.lastMessage || "",
-            timestamp: data.timestamp?.toDate() || null,
-          };
-        })
-      );
-
-      setConversations(convos);
+      setConversations(list);
       setLoading(false);
     });
 
-    return () => unsubscribe();
-  }, [currentUser]);
+    return () => unsub();
+  }, []);
 
   const openChat = (uid) => {
     navigate(`/chat/${uid}`);
   };
 
-  if (!currentUser)
-    return <p>⚠️ Tens de iniciar sessão para ver as conversas.</p>;
   if (loading) return <p>A carregar conversas...</p>;
+  if (conversations.length === 0) return <p>Sem conversas ainda.</p>;
 
   return (
-    <div style={{ maxWidth: 600, margin: "2rem auto", padding: "1rem" }}>
-      <h2>📬 As tuas conversas</h2>
-
-      {conversations.length === 0 && <p>Ainda não tens conversas.</p>}
-
-      <ul>
+    <div style={{ maxWidth: 600, margin: "2rem auto" }}>
+      <h2>💬 Conversas</h2>
+      <ul style={{ listStyle: "none", padding: 0 }}>
         {conversations.map((c) => (
           <li
             key={c.id}
+            onClick={() => openChat(c.id)}
             style={{
-              borderBottom: "1px solid #eee",
-              padding: "10px 0",
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
+              borderBottom: "1px solid #ddd",
+              padding: "10px",
+              cursor: "pointer",
+              backgroundColor: c.unread > 0 ? "#f5faff" : "white", // leve azul se tiver mensagens novas
             }}
           >
             <div>
               <strong>{c.name}</strong>
-              <p style={{ margin: 0, color: "#555" }}>{c.lastMessage}</p>
-              {c.timestamp && (
-                <small style={{ color: "#999" }}>
-                  {c.timestamp.toLocaleString()}
-                </small>
-              )}
+              <p style={{ margin: "4px 0", color: "#666" }}>
+                {c.lastMessage || "(sem mensagens ainda)"}
+              </p>
             </div>
-            <button onClick={() => openChat(c.id)}>💬 Chat</button>
+
+            {/* 🔵 Bolinha azul se houver mensagens não lidas */}
+            {c.unread > 0 && (
+              <div
+                style={{
+                  width: "12px",
+                  height: "12px",
+                  borderRadius: "50%",
+                  backgroundColor: "#007bff",
+                  marginLeft: "10px",
+                }}
+              ></div>
+            )}
           </li>
         ))}
       </ul>
