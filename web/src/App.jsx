@@ -11,7 +11,8 @@ import Home from "./pages/Home";
 import Chat from "./pages/Chat";
 import ProfilePublic from "./pages/ProfilePublic";
 import Conversations from "./pages/Conversations";
-
+import About from "./pages/About";
+import Terms from "./pages/Terms";
 import "./App.css";
 
 function App() {
@@ -82,6 +83,7 @@ function App() {
             💬 Mensagens {unreadCount > 0 && <strong>({unreadCount})</strong>}
           </Link>{" "}
           |{" "}
+          <Link to="/about">Sobre</Link> | <Link to="/terms">Termos</Link>
           <button
             onClick={handleLogout}
             style={{
@@ -183,6 +185,8 @@ function App() {
 
         {/* Login */}
         <Route path="/login" element={<AuthForm />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/terms" element={<Terms />} />
 
         {/* Página 404 */}
         <Route

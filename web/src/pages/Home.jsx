@@ -1,4 +1,3 @@
-// src/pages/Home.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import {
   collection,
@@ -21,10 +20,11 @@ import Filters from "../components/Filters";
 const DEFAULT_PHOTO_URL = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
 export default function Home() {
-  const [subject, setSubject] = useState("");
-  const [university, setUniversity] = useState("");
+  const [selectedSubjects, setSelectedSubjects] = useState([]);
+  const [selectedUniversities, setSelectedUniversities] = useState([]);
   const [mode, setMode] = useState("");
   const [sort, setSort] = useState("rating_desc");
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [lastDoc, setLastDoc] = useState(null);
@@ -56,7 +56,7 @@ export default function Home() {
     fetchLists();
   }, []);
 
-  // 🔹 Busca utilizadores (tutores ou alunos)
+  // 🔹 Função de busca (paginada)
   const fetchUsers = async (reset = true) => {
     setLoading(true);
     try {
@@ -65,8 +65,12 @@ export default function Home() {
 
       constraints.push(where("isTutor", "==", showTutors));
 
-      if (subject) constraints.push(where("subjects", "array-contains", subject));
-      if (university) constraints.push(where("university", "==", university));
+      if (selectedSubjects.length)
+        constraints.push(where("subjects", "array-contains-any", selectedSubjects));
+
+      if (selectedUniversities.length)
+        constraints.push(where("university", "in", selectedUniversities));
+
       if (mode) constraints.push(where("modes", "array-contains", mode));
 
       if (sort === "rating_desc") constraints.push(orderBy("ratingAvg", "desc"));
@@ -96,7 +100,7 @@ export default function Home() {
     setHasMore(true);
     fetchUsers(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject, university, mode, sort, showTutors]);
+  }, [selectedSubjects, selectedUniversities, mode, sort, showTutors]);
 
   // 🔹 Paginação
   const loadMore = async () => {
@@ -107,8 +111,10 @@ export default function Home() {
       const constraints = [];
 
       constraints.push(where("isTutor", "==", showTutors));
-      if (subject) constraints.push(where("subjects", "array-contains", subject));
-      if (university) constraints.push(where("university", "==", university));
+      if (selectedSubjects.length)
+        constraints.push(where("subjects", "array-contains-any", selectedSubjects));
+      if (selectedUniversities.length)
+        constraints.push(where("university", "in", selectedUniversities));
       if (mode) constraints.push(where("modes", "array-contains", mode));
 
       if (sort === "rating_desc") constraints.push(orderBy("ratingAvg", "desc"));
@@ -133,6 +139,14 @@ export default function Home() {
   };
 
   const suggestions = useMemo(() => allSubjects, [allSubjects]);
+
+  // 🔹 Limpar filtros
+  const clearFilters = () => {
+    setSelectedSubjects([]);
+    setSelectedUniversities([]);
+    setMode("");
+    setSort("rating_desc");
+  };
 
   // 🔹 Funções de interação
   const openProfile = (uid) => navigate(`/profile/${uid}`);
@@ -207,15 +221,18 @@ export default function Home() {
         </button>
       </div>
 
-      <SearchBar value={subject} onChange={setSubject} suggestions={suggestions} />
       <Filters
-        university={university}
-        setUniversity={setUniversity}
+        subjects={allSubjects}
+        selectedSubjects={selectedSubjects}
+        setSelectedSubjects={setSelectedSubjects}
+        universities={allUniversities}
+        selectedUniversities={selectedUniversities}
+        setSelectedUniversities={setSelectedUniversities}
         mode={mode}
         setMode={setMode}
         sort={sort}
         setSort={setSort}
-        universities={allUniversities}
+        clearFilters={clearFilters}
       />
 
       {/* Lista de utilizadores */}
@@ -245,7 +262,7 @@ export default function Home() {
             >
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <img
-                  src={u.photoURL || DEFAULT_PHOTO_URL}
+                  src={u.photoBase64 || DEFAULT_PHOTO_URL}
                   alt="foto"
                   style={{
                     width: 60,
