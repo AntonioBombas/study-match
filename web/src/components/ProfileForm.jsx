@@ -1,22 +1,27 @@
 // src/components/ProfileForm.jsx
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { setDoc, doc, getDoc } from 'firebase/firestore';
+import { setDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+
+const DEFAULT_PHOTO_URL = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
 const ProfileForm = () => {
-  // --- Tipo de utilizador (Tutor ou Aluno) ---
   const [isTutor, setIsTutor] = useState(true);
-
-  // --- Dados base ---
   const [name, setName] = useState('');
   const [university, setUniversity] = useState('');
   const [course, setCourse] = useState('');
+  const [bio, setBio] = useState('');
   const [subjects, setSubjects] = useState([]);
   const [newSubject, setNewSubject] = useState('');
   const [modes, setModes] = useState([]);
+  const [photoURL, setPhotoURL] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 🔹 Carrega o perfil atual (se existir)
+  const [ratingAvg, setRatingAvg] = useState(0);
+  const [ratingCount, setRatingCount] = useState(0);
+
+  // 🔹 Carregar perfil existente
   useEffect(() => {
     const loadProfile = async () => {
       const uid = auth.currentUser?.uid;
@@ -28,15 +33,20 @@ const ProfileForm = () => {
       try {
         const userRef = doc(db, 'users', uid);
         const snap = await getDoc(userRef);
-
         if (snap.exists()) {
           const data = snap.data();
           setName(data.name || '');
           setUniversity(data.university || '');
           setCourse(data.course || '');
+          setBio(data.bio || '');
           setSubjects(data.subjects || []);
           setModes(data.modes || []);
           setIsTutor(data.isTutor ?? true);
+          setPhotoURL(data.photoURL || DEFAULT_PHOTO_URL);
+          setRatingAvg(data.ratingAvg || 0);
+          setRatingCount(data.ratingCount || 0);
+        } else {
+          setPhotoURL(DEFAULT_PHOTO_URL);
         }
       } catch (err) {
         console.error('Erro ao carregar perfil:', err);
@@ -44,11 +54,33 @@ const ProfileForm = () => {
         setLoading(false);
       }
     };
-
     loadProfile();
   }, []);
 
-  // 🔹 Adiciona disciplina
+  // 🔹 Converter imagem para base64 e guardar
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Por favor seleciona uma imagem válida!");
+      return;
+    }
+    if (file.size > 400 * 1024) {
+      alert("A imagem é muito grande! Usa uma com menos de 400 KB.");
+      return;
+    }
+
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoURL(reader.result);
+      setUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // 🔹 Adicionar disciplina
   const addSubject = () => {
     const trimmed = newSubject.trim();
     if (trimmed && !subjects.includes(trimmed)) {
@@ -57,32 +89,21 @@ const ProfileForm = () => {
     }
   };
 
-  // 🔹 Remove disciplina
   const removeSubject = (subj) => {
     setSubjects(subjects.filter((s) => s !== subj));
   };
 
-  // 🔹 Alterna modo de explicação
   const toggleMode = (mode) => {
-    if (modes.includes(mode)) {
-      setModes(modes.filter((m) => m !== mode));
-    } else {
-      setModes([...modes, mode]);
-    }
+    if (modes.includes(mode)) setModes(modes.filter((m) => m !== mode));
+    else setModes([...modes, mode]);
   };
 
-  // 🔹 Submeter alterações
+  // 🔹 Guardar alterações
   const handleSubmit = async (e) => {
     e.preventDefault();
     const uid = auth.currentUser?.uid;
-
     if (!uid) {
-      alert('Tens de estar autenticado para guardar o perfil!');
-      return;
-    }
-
-    if (!name || !university || !course) {
-      alert('Preenche todos os campos obrigatórios!');
+      alert("Tens de estar autenticado!");
       return;
     }
 
@@ -94,52 +115,70 @@ const ProfileForm = () => {
           name,
           university,
           course,
+          bio,
           subjects,
           modes,
           isTutor,
+          photoURL: photoURL || DEFAULT_PHOTO_URL,
+          updatedAt: serverTimestamp(),
         },
-        { merge: true } // Atualiza apenas campos novos/alterados
+        { merge: true }
       );
-
-      alert('✅ Perfil atualizado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao guardar perfil:', error);
-      alert('Erro ao guardar perfil. Ver consola.');
+      alert("✅ Perfil atualizado!");
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao guardar perfil.");
     }
   };
 
-  if (loading) {
-    return <p style={{ textAlign: 'center', marginTop: '2rem' }}>A carregar perfil...</p>;
-  }
+  if (loading) return <p style={{ textAlign: 'center' }}>A carregar...</p>;
 
   return (
     <div style={{ maxWidth: 500, margin: 'auto', padding: '1.5rem' }}>
-      <h2 style={{ marginBottom: '1rem' }}>Editar o teu perfil</h2>
+      <h2>Editar Perfil</h2>
 
+      {/* Foto de perfil */}
+      <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+        <img
+          src={photoURL || DEFAULT_PHOTO_URL}
+          alt="Foto de perfil"
+          style={{
+            width: 100,
+            height: 100,
+            borderRadius: '50%',
+            objectFit: 'cover',
+            border: '2px solid #ccc',
+          }}
+        />
+        <div style={{ marginTop: 8 }}>
+          <input type="file" accept="image/*" onChange={handleImageUpload} />
+          {uploading && <p style={{ color: '#555' }}>📤 A processar imagem...</p>}
+        </div>
+      </div>
+
+      {/* Formulário */}
       <form
         onSubmit={handleSubmit}
         style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
       >
-        {/* --- Tipo de Utilizador --- */}
         <label>Tipo de utilizador:</label>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div>
           <label>
             <input
               type="radio"
-              checked={isTutor === true}
+              checked={isTutor}
               onChange={() => setIsTutor(true)}
             /> Tutor
           </label>
-          <label>
+          <label style={{ marginLeft: 12 }}>
             <input
               type="radio"
-              checked={isTutor === false}
+              checked={!isTutor}
               onChange={() => setIsTutor(false)}
             /> Aluno
           </label>
         </div>
 
-        {/* --- Campos principais --- */}
         <input
           type="text"
           placeholder="Nome"
@@ -147,7 +186,6 @@ const ProfileForm = () => {
           onChange={(e) => setName(e.target.value)}
           required
         />
-
         <input
           type="text"
           placeholder="Universidade"
@@ -155,7 +193,6 @@ const ProfileForm = () => {
           onChange={(e) => setUniversity(e.target.value)}
           required
         />
-
         <input
           type="text"
           placeholder="Curso"
@@ -164,54 +201,40 @@ const ProfileForm = () => {
           required
         />
 
-        {/* --- Disciplinas --- */}
+        <textarea
+          placeholder="Fala um pouco sobre ti..."
+          value={bio}
+          onChange={(e) => setBio(e.target.value)}
+        />
+
         {isTutor && (
           <>
-            <label>Disciplinas que dás</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <label>Disciplinas</label>
+            <div style={{ display: 'flex', gap: 8 }}>
               <input
                 type="text"
-                placeholder="Ex: Cálculo 1"
                 value={newSubject}
                 onChange={(e) => setNewSubject(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addSubject();
-                  }
-                }}
               />
-              <button type="button" onClick={addSubject}>+</button>
+              <button type="button" onClick={addSubject}>
+                +
+              </button>
             </div>
+            {subjects.map((s, i) => (
+              <div key={i}>
+                {s}{' '}
+                <button
+                  type="button"
+                  onClick={() => removeSubject(s)}
+                  style={{ border: 'none', background: 'transparent' }}
+                >
+                  ❌
+                </button>
+              </div>
+            ))}
 
-            {subjects.length > 0 && (
-              <ul style={{ marginTop: '8px' }}>
-                {subjects.map((s, i) => (
-                  <li key={i}>
-                    {s}{' '}
-                    <button
-                      type="button"
-                      onClick={() => removeSubject(s)}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      ❌
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-
-        {/* --- Modos de explicação --- */}
-        {isTutor && (
-          <>
-            <label>Modo de explicação</label>
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <label>Modo</label>
+            <div>
               <label>
                 <input
                   type="checkbox"
@@ -219,7 +242,7 @@ const ProfileForm = () => {
                   onChange={() => toggleMode('online')}
                 /> Online
               </label>
-              <label>
+              <label style={{ marginLeft: 12 }}>
                 <input
                   type="checkbox"
                   checked={modes.includes('presencial')}
@@ -227,22 +250,26 @@ const ProfileForm = () => {
                 /> Presencial
               </label>
             </div>
+
+            <p style={{ color: '#555' }}>
+              ⭐ {ratingAvg.toFixed(1)} ({ratingCount} avaliações)
+            </p>
           </>
         )}
 
         <button
           type="submit"
           style={{
-            marginTop: '1rem',
-            padding: '0.6rem 1rem',
+            marginTop: 12,
             background: '#007bff',
-            color: 'white',
+            color: '#fff',
+            padding: '8px 12px',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: 6,
             cursor: 'pointer',
           }}
         >
-          Salvar Perfil
+          Salvar
         </button>
       </form>
     </div>

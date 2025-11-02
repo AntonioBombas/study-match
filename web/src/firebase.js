@@ -7,7 +7,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyCqIjWt57Z3t5BN1pcdz1wSBA9YrdHo1ss",  // Certifica-te que esta chave é a correta
   authDomain: "study-match-mvp.firebaseapp.com",
   projectId: "study-match-mvp",
-  storageBucket: "study-match-mvp.firebasestorage.app",
+  storageBucket: "study-match-mvp.appspot.com",
   messagingSenderId: "10661284937",
   appId: "1:10661284937:web:0a99f9c9bbb157aa1d0398",
 };

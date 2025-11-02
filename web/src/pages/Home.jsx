@@ -17,6 +17,9 @@ import { useNavigate } from "react-router-dom";
 import SearchBar from "../components/SearchBar";
 import Filters from "../components/Filters";
 
+// 🔹 Foto padrão (silhueta tipo WhatsApp)
+const DEFAULT_PHOTO_URL = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+
 export default function Home() {
   const [subject, setSubject] = useState("");
   const [university, setUniversity] = useState("");
@@ -30,11 +33,11 @@ export default function Home() {
 
   const [allSubjects, setAllSubjects] = useState([]);
   const [allUniversities, setAllUniversities] = useState([]);
+  const [showTutors, setShowTutors] = useState(true);
 
-  const [showTutors, setShowTutors] = useState(true); // 🔹 Alternar entre alunos e tutores
   const navigate = useNavigate();
 
-  // 🔹 Carrega lista de subjects e universidades
+  // 🔹 Carrega lista de disciplinas e universidades
   useEffect(() => {
     const fetchLists = async () => {
       const q = collection(db, "users");
@@ -60,17 +63,16 @@ export default function Home() {
       let qRef = collection(db, "users");
       const constraints = [];
 
-      // 👇 Alterna entre ver tutores e alunos
       constraints.push(where("isTutor", "==", showTutors));
 
       if (subject) constraints.push(where("subjects", "array-contains", subject));
       if (university) constraints.push(where("university", "==", university));
       if (mode) constraints.push(where("modes", "array-contains", mode));
 
-      if (sort === "rating_desc") constraints.push(orderBy("rating", "desc"));
-      else if (sort === "rating_asc") constraints.push(orderBy("rating", "asc"));
+      if (sort === "rating_desc") constraints.push(orderBy("ratingAvg", "desc"));
+      else if (sort === "rating_asc") constraints.push(orderBy("ratingAvg", "asc"));
       else if (sort === "name_asc") constraints.push(orderBy("name", "asc"));
-      else constraints.push(orderBy("rating", "desc"));
+      else constraints.push(orderBy("ratingAvg", "desc"));
 
       constraints.push(limit(PAGE_SIZE));
 
@@ -99,7 +101,6 @@ export default function Home() {
   // 🔹 Paginação
   const loadMore = async () => {
     if (!hasMore || !lastDoc) return;
-
     setLoading(true);
     try {
       let qRef = collection(db, "users");
@@ -110,10 +111,10 @@ export default function Home() {
       if (university) constraints.push(where("university", "==", university));
       if (mode) constraints.push(where("modes", "array-contains", mode));
 
-      if (sort === "rating_desc") constraints.push(orderBy("rating", "desc"));
-      else if (sort === "rating_asc") constraints.push(orderBy("rating", "asc"));
+      if (sort === "rating_desc") constraints.push(orderBy("ratingAvg", "desc"));
+      else if (sort === "rating_asc") constraints.push(orderBy("ratingAvg", "asc"));
       else if (sort === "name_asc") constraints.push(orderBy("name", "asc"));
-      else constraints.push(orderBy("rating", "desc"));
+      else constraints.push(orderBy("ratingAvg", "desc"));
 
       constraints.push(startAfter(lastDoc));
       constraints.push(limit(PAGE_SIZE));
@@ -133,12 +134,9 @@ export default function Home() {
 
   const suggestions = useMemo(() => allSubjects, [allSubjects]);
 
-  // 🔹 Funções dos botões
-  const openProfile = (uid) => {
-    navigate(`/profile/${uid}`);
-  };
+  // 🔹 Funções de interação
+  const openProfile = (uid) => navigate(`/profile/${uid}`);
 
-  // 🔹 Inicia conversa e abre o chat
   const openChat = async (uid) => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
@@ -173,10 +171,12 @@ export default function Home() {
   };
 
   return (
-    <div>
-      <h2>{showTutors ? "🎓 Procurar tutores" : "👥 Procurar alunos"}</h2>
+    <div style={{ maxWidth: 900, margin: "auto", padding: "1rem" }}>
+      <h2 style={{ marginBottom: "1rem" }}>
+        {showTutors ? "🎓 Procurar tutores" : "👥 Procurar alunos"}
+      </h2>
 
-      {/* 🔹 Alternador entre Tutores e Alunos */}
+      {/* Alternador Tutores / Alunos */}
       <div style={{ marginBottom: "15px" }}>
         <button
           onClick={() => setShowTutors(true)}
@@ -208,7 +208,6 @@ export default function Home() {
       </div>
 
       <SearchBar value={subject} onChange={setSubject} suggestions={suggestions} />
-
       <Filters
         university={university}
         setUniversity={setUniversity}
@@ -219,38 +218,94 @@ export default function Home() {
         universities={allUniversities}
       />
 
-      <div style={{ marginTop: 16 }}>
+      {/* Lista de utilizadores */}
+      <div style={{ marginTop: 20 }}>
         {loading && <p>A carregar resultados...</p>}
         {!loading && users.length === 0 && (
           <p>Nenhum utilizador encontrado com esses filtros.</p>
         )}
 
-        <ul>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: "16px",
+          }}
+        >
           {users.map((u) => (
-            <li
+            <div
               key={u.id}
               style={{
-                marginBottom: 12,
-                borderBottom: "1px solid #eee",
-                paddingBottom: 8,
+                border: "1px solid #ddd",
+                borderRadius: "10px",
+                padding: "12px",
+                background: "#fafafa",
+                boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
               }}
             >
-              <strong>{u.name || "Sem nome"}</strong> — {u.course || ""} <br />
-              <small>{u.university || ""}</small>
-              <p>Matérias: {(u.subjects || []).join(", ")}</p>
-              <p>Modos: {(u.modes || []).join(", ")}</p>
-              <p>Rating: {u.rating ?? "—"}</p>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <img
+                  src={u.photoURL || DEFAULT_PHOTO_URL}
+                  alt="foto"
+                  style={{
+                    width: 60,
+                    height: 60,
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                    border: "1px solid #ccc",
+                  }}
+                />
+                <div>
+                  <strong>{u.name || "Sem nome"}</strong>
+                  <br />
+                  <small>{u.university || "Sem universidade"}</small>
+                </div>
+              </div>
 
-              <div style={{ display: "flex", gap: "8px" }}>
+              <p style={{ marginTop: 10, color: "#555" }}>
+                <strong>Curso:</strong> {u.course || "—"}
+              </p>
+              {u.bio && (
+                <p style={{ color: "#666", fontStyle: "italic" }}>
+                  {u.bio.slice(0, 80)}
+                  {u.bio.length > 80 ? "..." : ""}
+                </p>
+              )}
+
+              {showTutors && (
+                <>
+                  <p>
+                    <strong>Disciplinas:</strong>{" "}
+                    {(u.subjects || []).join(", ") || "—"}
+                  </p>
+                  <p>
+                    <strong>Modos:</strong>{" "}
+                    {(u.modes || []).join(", ") || "—"}
+                  </p>
+                  <p>
+                    ⭐ {u.ratingAvg?.toFixed(1) ?? "—"} ({u.ratingCount ?? 0})
+                  </p>
+                </>
+              )}
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginTop: "10px",
+                }}
+              >
                 <button onClick={() => openProfile(u.id)}>Ver perfil</button>
                 <button onClick={() => openChat(u.id)}>Contactar</button>
               </div>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
 
         {hasMore && !loading && (
-          <button onClick={loadMore}>Carregar mais</button>
+          <div style={{ textAlign: "center", marginTop: 16 }}>
+            <button onClick={loadMore}>Carregar mais</button>
+          </div>
         )}
       </div>
     </div>
