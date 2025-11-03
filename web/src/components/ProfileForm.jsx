@@ -146,6 +146,8 @@ const ProfileForm = () => {
           modes,
           isTutor,
           photoURL: photoURL || DEFAULT_PHOTO_URL,
+          ratingAvg: ratingAvg ?? 0,
+          ratingCount: ratingCount ?? 0,
           updatedAt: serverTimestamp(),
         },
         { merge: true }
