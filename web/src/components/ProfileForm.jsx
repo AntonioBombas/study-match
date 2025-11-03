@@ -1,21 +1,21 @@
-// src/components/ProfileForm.jsx
-import React, { useState, useEffect } from 'react';
-import { db, auth } from '../firebase';
-import { setDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import React, { useState, useEffect } from "react";
+import { db, auth } from "../firebase";
+import { setDoc, doc, getDoc, serverTimestamp } from "firebase/firestore";
 
 const DEFAULT_PHOTO_URL = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
 const ProfileForm = () => {
   const [isTutor, setIsTutor] = useState(true);
-  const [name, setName] = useState('');
-  const [university, setUniversity] = useState('');
-  const [course, setCourse] = useState('');
-  const [bio, setBio] = useState('');
+  const [name, setName] = useState("");
+  const [university, setUniversity] = useState("");
+  const [course, setCourse] = useState("");
+  const [bio, setBio] = useState("");
   const [subjects, setSubjects] = useState([]);
-  const [newSubject, setNewSubject] = useState('');
+  const [newSubject, setNewSubject] = useState("");
   const [modes, setModes] = useState([]);
   const [photoURL, setPhotoURL] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState("");
   const [loading, setLoading] = useState(true);
 
   const [ratingAvg, setRatingAvg] = useState(0);
@@ -31,14 +31,14 @@ const ProfileForm = () => {
       }
 
       try {
-        const userRef = doc(db, 'users', uid);
+        const userRef = doc(db, "users", uid);
         const snap = await getDoc(userRef);
         if (snap.exists()) {
           const data = snap.data();
-          setName(data.name || '');
-          setUniversity(data.university || '');
-          setCourse(data.course || '');
-          setBio(data.bio || '');
+          setName(data.name || "");
+          setUniversity(data.university || "");
+          setCourse(data.course || "");
+          setBio(data.bio || "");
           setSubjects(data.subjects || []);
           setModes(data.modes || []);
           setIsTutor(data.isTutor ?? true);
@@ -49,7 +49,7 @@ const ProfileForm = () => {
           setPhotoURL(DEFAULT_PHOTO_URL);
         }
       } catch (err) {
-        console.error('Erro ao carregar perfil:', err);
+        console.error("Erro ao carregar perfil:", err);
       } finally {
         setLoading(false);
       }
@@ -57,7 +57,7 @@ const ProfileForm = () => {
     loadProfile();
   }, []);
 
-  // 🔹 Converter imagem para base64 e guardar
+  // 🔹 Lê e comprime imagem antes de guardar
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -66,17 +66,43 @@ const ProfileForm = () => {
       alert("Por favor seleciona uma imagem válida!");
       return;
     }
-    if (file.size > 400 * 1024) {
-      alert("A imagem é muito grande! Usa uma com menos de 400 KB.");
-      return;
-    }
 
     setUploading(true);
+    setUploadMessage("📸 A processar imagem...");
+
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setPhotoURL(reader.result);
-      setUploading(false);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 400; // px
+        const scale = Math.min(1, MAX_WIDTH / img.width);
+        const width = img.width * scale;
+        const height = img.height * scale;
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Converter para JPEG comprimido
+        const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+
+        setPhotoURL(compressedBase64);
+        setUploading(false);
+        setUploadMessage("✅ Imagem comprimida com sucesso!");
+      };
+
+      img.onerror = () => {
+        alert("Erro ao carregar a imagem. Tenta outra.");
+        setUploading(false);
+        setUploadMessage("");
+      };
     };
+
     reader.readAsDataURL(file);
   };
 
@@ -85,7 +111,7 @@ const ProfileForm = () => {
     const trimmed = newSubject.trim();
     if (trimmed && !subjects.includes(trimmed)) {
       setSubjects([...subjects, trimmed]);
-      setNewSubject('');
+      setNewSubject("");
     }
   };
 
@@ -109,7 +135,7 @@ const ProfileForm = () => {
 
     try {
       await setDoc(
-        doc(db, 'users', uid),
+        doc(db, "users", uid),
         {
           uid,
           name,
@@ -131,35 +157,38 @@ const ProfileForm = () => {
     }
   };
 
-  if (loading) return <p style={{ textAlign: 'center' }}>A carregar...</p>;
+  if (loading) return <p style={{ textAlign: "center" }}>A carregar...</p>;
 
   return (
-    <div style={{ maxWidth: 500, margin: 'auto', padding: '1.5rem' }}>
+    <div style={{ maxWidth: 500, margin: "auto", padding: "1.5rem" }}>
       <h2>Editar Perfil</h2>
 
       {/* Foto de perfil */}
-      <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+      <div style={{ textAlign: "center", marginBottom: "1rem" }}>
         <img
           src={photoURL || DEFAULT_PHOTO_URL}
           alt="Foto de perfil"
           style={{
             width: 100,
             height: 100,
-            borderRadius: '50%',
-            objectFit: 'cover',
-            border: '2px solid #ccc',
+            borderRadius: "50%",
+            objectFit: "cover",
+            border: "2px solid #ccc",
           }}
         />
         <div style={{ marginTop: 8 }}>
           <input type="file" accept="image/*" onChange={handleImageUpload} />
-          {uploading && <p style={{ color: '#555' }}>📤 A processar imagem...</p>}
+          {uploading && <p style={{ color: "#555" }}>{uploadMessage}</p>}
+          {!uploading && uploadMessage && (
+            <p style={{ color: "green" }}>{uploadMessage}</p>
+          )}
         </div>
       </div>
 
       {/* Formulário */}
       <form
         onSubmit={handleSubmit}
-        style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+        style={{ display: "flex", flexDirection: "column", gap: "12px" }}
       >
         <label>Tipo de utilizador:</label>
         <div>
@@ -168,14 +197,16 @@ const ProfileForm = () => {
               type="radio"
               checked={isTutor}
               onChange={() => setIsTutor(true)}
-            /> Tutor
+            />{" "}
+            Tutor
           </label>
           <label style={{ marginLeft: 12 }}>
             <input
               type="radio"
               checked={!isTutor}
               onChange={() => setIsTutor(false)}
-            /> Aluno
+            />{" "}
+            Aluno
           </label>
         </div>
 
@@ -210,7 +241,7 @@ const ProfileForm = () => {
         {isTutor && (
           <>
             <label>Disciplinas</label>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: "flex", gap: 8 }}>
               <input
                 type="text"
                 value={newSubject}
@@ -222,11 +253,11 @@ const ProfileForm = () => {
             </div>
             {subjects.map((s, i) => (
               <div key={i}>
-                {s}{' '}
+                {s}{" "}
                 <button
                   type="button"
                   onClick={() => removeSubject(s)}
-                  style={{ border: 'none', background: 'transparent' }}
+                  style={{ border: "none", background: "transparent" }}
                 >
                   ❌
                 </button>
@@ -238,20 +269,22 @@ const ProfileForm = () => {
               <label>
                 <input
                   type="checkbox"
-                  checked={modes.includes('online')}
-                  onChange={() => toggleMode('online')}
-                /> Online
+                  checked={modes.includes("online")}
+                  onChange={() => toggleMode("online")}
+                />{" "}
+                Online
               </label>
               <label style={{ marginLeft: 12 }}>
                 <input
                   type="checkbox"
-                  checked={modes.includes('presencial')}
-                  onChange={() => toggleMode('presencial')}
-                /> Presencial
+                  checked={modes.includes("presencial")}
+                  onChange={() => toggleMode("presencial")}
+                />{" "}
+                Presencial
               </label>
             </div>
 
-            <p style={{ color: '#555' }}>
+            <p style={{ color: "#555" }}>
               ⭐ {ratingAvg.toFixed(1)} ({ratingCount} avaliações)
             </p>
           </>
@@ -261,12 +294,12 @@ const ProfileForm = () => {
           type="submit"
           style={{
             marginTop: 12,
-            background: '#007bff',
-            color: '#fff',
-            padding: '8px 12px',
-            border: 'none',
+            background: "#007bff",
+            color: "#fff",
+            padding: "8px 12px",
+            border: "none",
             borderRadius: 6,
-            cursor: 'pointer',
+            cursor: "pointer",
           }}
         >
           Salvar

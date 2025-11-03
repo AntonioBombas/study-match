@@ -1,15 +1,16 @@
+// src/pages/Home.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import {
   collection,
   query,
   where,
-  getDocs,
   orderBy,
   limit,
   startAfter,
   setDoc,
   doc,
   getDoc,
+  onSnapshot,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
@@ -37,11 +38,11 @@ export default function Home() {
 
   const navigate = useNavigate();
 
-  // 🔹 Carrega lista de disciplinas e universidades
+  // 🔹 Carrega lista de disciplinas e universidades (uma vez)
   useEffect(() => {
     const fetchLists = async () => {
       const q = collection(db, "users");
-      const snap = await getDocs(q);
+      const snap = await getDoc(q);
       const subjectsSet = new Set();
       const unisSet = new Set();
       snap.forEach((d) => {
@@ -56,55 +57,52 @@ export default function Home() {
     fetchLists();
   }, []);
 
-  // 🔹 Função de busca (paginada)
-  const fetchUsers = async (reset = true) => {
-    setLoading(true);
-    try {
-      let qRef = collection(db, "users");
-      const constraints = [];
-
-      constraints.push(where("isTutor", "==", showTutors));
-
-      if (selectedSubjects.length)
-        constraints.push(where("subjects", "array-contains-any", selectedSubjects));
-
-      if (selectedUniversities.length)
-        constraints.push(where("university", "in", selectedUniversities));
-
-      if (mode) constraints.push(where("modes", "array-contains", mode));
-
-      if (sort === "rating_desc") constraints.push(orderBy("ratingAvg", "desc"));
-      else if (sort === "rating_asc") constraints.push(orderBy("ratingAvg", "asc"));
-      else if (sort === "name_asc") constraints.push(orderBy("name", "asc"));
-      else constraints.push(orderBy("ratingAvg", "desc"));
-
-      constraints.push(limit(PAGE_SIZE));
-
-      const q = query(qRef, ...constraints);
-      const snap = await getDocs(q);
-
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setUsers(reset ? list : (prev) => [...prev, ...list]);
-      setLastDoc(snap.docs[snap.docs.length - 1] || null);
-      setHasMore(snap.docs.length === PAGE_SIZE);
-    } catch (err) {
-      console.error("Erro ao buscar utilizadores:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 🔹 Atualiza lista quando filtros mudam
+  // 🔹 Atualiza lista em tempo real (sem recarregar)
   useEffect(() => {
-    setLastDoc(null);
-    setHasMore(true);
-    fetchUsers(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setLoading(true);
+
+    let qRef = collection(db, "users");
+    const constraints = [];
+
+    constraints.push(where("isTutor", "==", showTutors));
+
+    if (selectedSubjects.length)
+      constraints.push(where("subjects", "array-contains-any", selectedSubjects));
+    if (selectedUniversities.length)
+      constraints.push(where("university", "in", selectedUniversities));
+    if (mode) constraints.push(where("modes", "array-contains", mode));
+
+    if (sort === "rating_desc") constraints.push(orderBy("ratingAvg", "desc"));
+    else if (sort === "rating_asc") constraints.push(orderBy("ratingAvg", "asc"));
+    else if (sort === "name_asc") constraints.push(orderBy("name", "asc"));
+    else constraints.push(orderBy("ratingAvg", "desc"));
+
+    constraints.push(limit(PAGE_SIZE));
+
+    const q = query(qRef, ...constraints);
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setUsers(list);
+        setLastDoc(snap.docs[snap.docs.length - 1] || null);
+        setHasMore(snap.docs.length === PAGE_SIZE);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Erro ao ouvir utilizadores:", err);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
   }, [selectedSubjects, selectedUniversities, mode, sort, showTutors]);
 
-  // 🔹 Paginação
+  // 🔹 Paginação (carregar mais)
   const loadMore = async () => {
     if (!hasMore || !lastDoc) return;
+
     setLoading(true);
     try {
       let qRef = collection(db, "users");
@@ -128,6 +126,7 @@ export default function Home() {
       const q = query(qRef, ...constraints);
       const snap = await getDocs(q);
       const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
       setUsers((prev) => [...prev, ...list]);
       setLastDoc(snap.docs[snap.docs.length - 1] || null);
       setHasMore(snap.docs.length === PAGE_SIZE);
@@ -148,7 +147,7 @@ export default function Home() {
     setSort("rating_desc");
   };
 
-  // 🔹 Funções de interação
+  // 🔹 Interações
   const openProfile = (uid) => navigate(`/profile/${uid}`);
 
   const openChat = async (uid) => {
@@ -262,7 +261,7 @@ export default function Home() {
             >
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <img
-                  src={u.photoBase64 || DEFAULT_PHOTO_URL}
+                  src={u.photoURL || DEFAULT_PHOTO_URL}
                   alt="foto"
                   style={{
                     width: 60,

@@ -16,12 +16,12 @@ import Terms from "./pages/Terms";
 import "./App.css";
 
 function App() {
-  const [user, setUser] = useState(undefined); // undefined = ainda a carregar
-  const [unreadCount, setUnreadCount] = useState(0); // contador de mensagens novas
+  const [user, setUser] = useState(undefined);
+  const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 🔹 Atualiza o título da aba conforme a rota
+  // 🔹 Atualiza o título da aba
   useEffect(() => {
     const titles = {
       "/": "Home | Study Match",
@@ -32,30 +32,26 @@ function App() {
     document.title = titles[location.pathname] || "Study Match";
   }, [location]);
 
-  // 🔹 Monitora o estado da autenticação
+  // 🔹 Monitora a autenticação
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
-      console.log("Estado do utilizador:", u);
       setUser(u || null);
     });
     return () => unsubscribe();
   }, []);
 
-  // 🔹 Escuta em tempo real o número de mensagens não lidas
+  // 🔹 Escuta mensagens não lidas
   useEffect(() => {
     if (!user) return;
-
     const q = collection(db, "users", user.uid, "conversations");
     const unsub = onSnapshot(q, (snap) => {
       let count = 0;
       snap.forEach((doc) => {
         const data = doc.data();
-        // Exemplo: cada conversa pode ter campo "unread" com número de mensagens por ler
         if (data.unread && data.unread > 0) count += data.unread;
       });
       setUnreadCount(count);
     });
-
     return () => unsub();
   }, [user]);
 
@@ -70,53 +66,57 @@ function App() {
   const NavBar = () => (
     <nav
       style={{
-        padding: "10px",
+        background: "#f9f9f9",
         borderBottom: "1px solid #ddd",
+        padding: "10px",
         marginBottom: "20px",
+        borderRadius: "8px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
       }}
     >
-      {user ? (
-        <>
-          <Link to="/">🏠 Home</Link> |{" "}
-          <Link to="/profile">👤 Perfil</Link> |{" "}
-          <Link to="/conversations">
-            💬 Mensagens {unreadCount > 0 && <strong>({unreadCount})</strong>}
-          </Link>{" "}
-          |{" "}
-          <Link to="/about">Sobre</Link> | <Link to="/terms">Termos</Link>
+      <div>
+        {user ? (
+          <>
+            <Link to="/">🏠 Home</Link> |{" "}
+            <Link to="/profile">👤 Perfil</Link> |{" "}
+            <Link to="/conversations">
+              💬 Mensagens {unreadCount > 0 && <strong>({unreadCount})</strong>}
+            </Link>{" "}
+            | <Link to="/about">Sobre</Link> | <Link to="/terms">Termos</Link>
+          </>
+        ) : (
+          <>
+            <Link to="/">🏠 Home</Link> | <Link to="/login">Entrar</Link>
+          </>
+        )}
+      </div>
+
+      {user && (
+        <div>
           <button
             onClick={handleLogout}
             style={{
               background: "none",
               border: "none",
-              color: "blue",
+              color: "#007bff",
               cursor: "pointer",
+              fontSize: "15px",
             }}
           >
             🚪 Sair
           </button>
-          <span style={{ marginLeft: "10px", color: "#555" }}>
-            {user.email}
-          </span>
-        </>
-      ) : (
-        <>
-          <Link to="/">🏠 Home</Link> | <Link to="/login">Entrar</Link>
-        </>
+          <span style={{ marginLeft: "10px", color: "#555" }}>{user.email}</span>
+        </div>
       )}
     </nav>
   );
 
-  // 🔹 Enquanto o auth ainda está a carregar
+  // 🔹 Enquanto carrega
   if (user === undefined) {
     return (
-      <div
-        style={{
-          textAlign: "center",
-          marginTop: "100px",
-          fontSize: "20px",
-        }}
-      >
+      <div style={{ textAlign: "center", marginTop: "100px", fontSize: "20px" }}>
         <h2>🔄 A verificar sessão...</h2>
         <p>Por favor, aguarda um momento.</p>
       </div>
@@ -125,7 +125,16 @@ function App() {
 
   // 🔹 Estrutura principal
   return (
-    <div className="App" style={{ padding: "2rem" }}>
+    <div
+      className="App"
+      style={{
+        padding: "2rem",
+        backgroundColor: "#ffffff",
+        color: "#000000",
+        minHeight: "100vh",
+        fontFamily: "system-ui, sans-serif",
+      }}
+    >
       <h1>🎓 Study Match MVP</h1>
 
       <NavBar />
@@ -147,7 +156,7 @@ function App() {
           }
         />
 
-        {/* Perfil (edição do utilizador logado) */}
+        {/* Perfil */}
         <Route
           path="/profile"
           element={
@@ -162,13 +171,13 @@ function App() {
           }
         />
 
-        {/* Página pública de um perfil */}
+        {/* Perfil público */}
         <Route path="/profile/:uid" element={<ProfilePublic />} />
 
-        {/* Chat individual */}
+        {/* Chat */}
         <Route path="/chat/:uid" element={<Chat />} />
 
-        {/* Conversas recentes */}
+        {/* Conversas */}
         <Route
           path="/conversations"
           element={
@@ -183,12 +192,12 @@ function App() {
           }
         />
 
-        {/* Login */}
+        {/* Páginas estáticas */}
         <Route path="/login" element={<AuthForm />} />
         <Route path="/about" element={<About />} />
         <Route path="/terms" element={<Terms />} />
 
-        {/* Página 404 */}
+        {/* 404 */}
         <Route
           path="*"
           element={

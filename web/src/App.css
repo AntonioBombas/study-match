@@ -1,42 +1,166 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* ===============================
+   🎨 Tema claro fixo (Study Match)
+   =============================== */
+
+html, body {
+  background-color: #ffffff;
+  color: #1c1c1c;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* ====== Estrutura geral ====== */
+.App {
+  background-color: #ffffff;
+  color: #1c1c1c;
+  transition: background-color 0.3s, color 0.3s;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
+h1, h2, h3, h4 {
+  color: #111;
+}
+
+p, span, small, label {
+  color: #333;
+}
+
+/* ====== Links ====== */
+a {
+  color: #007bff;
+  text-decoration: none;
+  font-weight: 500;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* ====== Navegação ====== */
+nav {
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 20px;
+}
+nav a {
+  color: #007bff;
+}
+nav a:hover {
+  text-decoration: underline;
+}
+
+/* ====== Botões ====== */
+button {
+  font-size: 15px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 8px 12px;
+  transition: background-color 0.3s, color 0.3s, opacity 0.2s;
+}
+
+/* Botões principais (ações importantes) */
+button.primary {
+  background-color: #007bff;
+  color: #fff;
+}
+button.primary:hover {
+  background-color: #005fcc;
+}
+
+/* Botões secundários (como "Ver perfil", "Contactar") */
+button.secondary {
+  background-color: #e9ecef;
+  color: #1c1c1c;
+  border: 1px solid #ccc;
+}
+button.secondary:hover {
+  background-color: #007bff;
+  color: #fff;
+}
+
+/* Botão "Carregar mais" */
+button.load-more {
+  background-color: #f5f5f5;
+  color: #007bff;
+  border: 1px solid #007bff;
+}
+button.load-more:hover {
+  background-color: #007bff;
+  color: #fff;
+}
+
+/* ====== Inputs ====== */
+input, textarea, select {
+  background-color: #fff;
+  color: #1c1c1c;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 8px;
+  width: 100%;
+  transition: border-color 0.3s;
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+/* ====== Cartões (perfis, home, etc.) ====== */
+.card, .user-card, .profile-card {
+  background-color: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  padding: 1rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card:hover, .user-card:hover, .profile-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* ====== Bolhas de chat ====== */
+.chat-bubble {
+  padding: 8px 12px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  max-width: 75%;
+  word-wrap: break-word;
+  line-height: 1.4;
+  font-size: 15px;
+}
+
+/* Mensagem de outra pessoa */
+.chat-bubble.other {
+  background-color: #f1f0f0;
+  color: #000;
+  align-self: flex-start;
+}
+
+/* Mensagem do próprio utilizador */
+.chat-bubble.self {
+  background-color: #007bff;
+  color: #fff;
+  align-self: flex-end;
+}
+
+/* ====== Responsividade ====== */
+@media (max-width: 600px) {
+  body {
+    padding: 0 1rem;
   }
-  to {
-    transform: rotate(360deg);
+
+  nav {
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+  }
+
+  button {
+    width: 100%;
+    margin-top: 5px;
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
-}
